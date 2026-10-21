@@ -1,0 +1,9 @@
+2026-10-20T10:12:01.104Z INFO  [order-worker] Starting order-processor-7d8f9c6b5-x9k2m in namespace prod-commerce (container: order-worker, image: gcr.io/acme-prod/order-worker:v1.8.2)
+2026-10-20T10:12:03.412Z INFO  [order-worker] Connected to Kafka broker kafka-headless.prod-commerce.svc.cluster.local:9092
+2026-10-20T10:13:15.882Z INFO  [order-worker] Processing bulk settlement batch batch_id=20261020_09 (items=250000)
+2026-10-20T10:14:02.190Z WARN  [order-worker] Heap memory usage at 488Mi / 512Mi (95.3%) while buffering batch_id=20261020_09
+2026-10-20T10:14:08.901Z ERROR [order-worker] MemoryError: Unable to allocate 64.0 MiB for in-memory settlement aggregation buffer
+2026-10-20T10:14:09.112Z FATAL [kernel] Memory cgroup out of memory: Killed process 18422 (python3) total-vm:1245184kB, anon-rss:524288kB, file-rss:1420kB
+2026-10-20T10:14:09.500Z Warning  OOMKilling  Pod/order-processor-7d8f9c6b5-x9k2m  Memory cgroup out of memory: Killed process 18422 (python3)
+2026-10-20T10:14:10.015Z Normal   Killing     Pod/order-processor-7d8f9c6b5-x9k2m  State: Terminated, Reason: OOMKilled, Exit Code: 137
+2026-10-20T10:14:12.330Z Warning  BackOff     Pod/order-processor-7d8f9c6b5-x9k2m  Back-off restarting failed container order-worker in pod order-processor-7d8f9c6b5-x9k2m_prod-commerce (CrashLoopBackOff)

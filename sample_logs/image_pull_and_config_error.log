@@ -1,0 +1,6 @@
+2026-10-20T12:20:01.000Z Normal   Scheduled  Pod/checkout-service-5c7b8f9d4-m2n7v  Successfully assigned checkout/checkout-service-5c7b8f9d4-m2n7v to gke-prod-pool-1-8a9b2c1d-k4x9
+2026-10-20T12:20:02.310Z Normal   Pulling    Pod/checkout-service-5c7b8f9d4-m2n7v  Pulling image "us-east1-docker.pkg.dev/acme/checkout/checkout-service:v2.9.99-missing"
+2026-10-20T12:20:05.840Z Warning  Failed     Pod/checkout-service-5c7b8f9d4-m2n7v  Failed to pull image "us-east1-docker.pkg.dev/acme/checkout/checkout-service:v2.9.99-missing": rpc error: code = NotFound desc = failed to pull and unpack image: manifest for us-east1-docker.pkg.dev/acme/checkout/checkout-service:v2.9.99-missing not found
+2026-10-20T12:20:05.845Z Warning  Failed     Pod/checkout-service-5c7b8f9d4-m2n7v  Error: ErrImagePull
+2026-10-20T12:20:18.110Z Warning  BackOff    Pod/checkout-service-5c7b8f9d4-m2n7v  Back-off pulling image "us-east1-docker.pkg.dev/acme/checkout/checkout-service:v2.9.99-missing": ImagePullBackOff
+2026-10-20T12:22:01.005Z Warning  Failed     Pod/checkout-worker-8f4d2c1b9-p9r3t   Error: secret "stripe-api-credentials" not found (CreateContainerConfigError)

@@ -1,0 +1,88 @@
+{
+  "eval_cases": [
+    {
+      "eval_case_id": "oom_killed_pasted_logs",
+      "prompt": {
+        "role": "user",
+        "parts": [
+          {
+            "text": "Investigate the following Kubernetes pod logs and provide a detailed root-cause analysis and supporting evidence:\n\n2026-10-20T10:14:02.190Z WARN  [order-worker] Heap memory usage at 488Mi / 512Mi (95.3%) while buffering batch_id=20261020_09\n2026-10-20T10:14:08.901Z ERROR [order-worker] MemoryError: Unable to allocate 64.0 MiB for in-memory settlement aggregation buffer\n2026-10-20T10:14:09.112Z FATAL [kernel] Memory cgroup out of memory: Killed process 18422 (python3) total-vm:1245184kB, anon-rss:524288kB, file-rss:1420kB\n2026-10-20T10:14:10.015Z Normal   Killing     Pod/order-processor-7d8f9c6b5-x9k2m  State: Terminated, Reason: OOMKilled, Exit Code: 137\n2026-10-20T10:14:12.330Z Warning  BackOff     Pod/order-processor-7d8f9c6b5-x9k2m  Back-off restarting failed container order-worker in pod order-processor-7d8f9c6b5-x9k2m_prod-commerce (CrashLoopBackOff)"
+          }
+        ]
+      },
+      "reference": {
+        "response": {
+          "role": "model",
+          "parts": [
+            {
+              "text": "The primary root cause is container memory exhaustion (OOMKilled with Exit Code 137) in container order-worker of pod order-processor-7d8f9c6b5-x9k2m (namespace prod-commerce) after reaching its 512Mi memory limit while buffering batch_id=20261020_09. CrashLoopBackOff is a downstream symptom. Supporting evidence includes the verbatim log lines showing 488Mi/512Mi heap usage, MemoryError allocating 64.0 MiB, kernel Memory cgroup out of memory killing process 18422, State: Terminated Reason: OOMKilled Exit Code: 137, and Back-off restarting failed container."
+            }
+          ]
+        }
+      }
+    },
+    {
+      "eval_case_id": "probe_and_db_failure_file_logs",
+      "prompt": {
+        "role": "user",
+        "parts": [
+          {
+            "text": "Please investigate the Kubernetes incident in the local log file sample_logs/payment_service_probe_failure.log and provide a detailed analysis and supporting evidence."
+          }
+        ]
+      },
+      "reference": {
+        "response": {
+          "role": "model",
+          "parts": [
+            {
+              "text": "The primary root cause is an upstream PostgreSQL database connection failure (dial tcp 10.96.0.15:5432: connect: connection refused) in container payment-api of pod payment-service-6b9f4d7c8-q4w8p (namespace payments). Because the database is unreachable, the /healthz endpoint returned HTTP 503, causing both Readiness and Liveness probe failures, which triggered kubelet to kill and restart the container (Exit Code 143) and enter CrashLoopBackOff."
+            }
+          ]
+        }
+      }
+    },
+    {
+      "eval_case_id": "image_pull_and_secret_config_error",
+      "prompt": {
+        "role": "user",
+        "parts": [
+          {
+            "text": "Investigate the Kubernetes failures in sample_logs/image_pull_and_config_error.log and provide a detailed analysis with supporting evidence."
+          }
+        ]
+      },
+      "reference": {
+        "response": {
+          "role": "model",
+          "parts": [
+            {
+              "text": "There are two distinct root causes in the checkout namespace: (1) Pod checkout-service-5c7b8f9d4-m2n7v failed with ErrImagePull / ImagePullBackOff because the image tag us-east1-docker.pkg.dev/acme/checkout/checkout-service:v2.9.99-missing was not found in the registry (rpc error: code = NotFound), and (2) Pod checkout-worker-8f4d2c1b9-p9r3t failed with CreateContainerConfigError because the Kubernetes Secret \"stripe-api-credentials\" was not found."
+            }
+          ]
+        }
+      }
+    },
+    {
+      "eval_case_id": "inconclusive_healthy_logs_edge_case",
+      "prompt": {
+        "role": "user",
+        "parts": [
+          {
+            "text": "Investigate these Kubernetes logs and tell me the root cause and supporting evidence:\n\n2026-10-20T14:00:01.000Z Normal Scheduled Pod/frontend-web-6d4b7c8f9-abcde Successfully assigned default/frontend-web-6d4b7c8f9-abcde to node-pool-1\n2026-10-20T14:00:02.100Z Normal Pulled Pod/frontend-web-6d4b7c8f9-abcde Container image \"nginx:1.27-alpine\" already present on machine\n2026-10-20T14:00:02.450Z Normal Created Pod/frontend-web-6d4b7c8f9-abcde Created container frontend\n2026-10-20T14:00:02.800Z Normal Started Pod/frontend-web-6d4b7c8f9-abcde Started container frontend\n2026-10-20T14:00:05.000Z INFO [nginx] worker processes started and listening on 0.0.0.0:8080"
+          }
+        ]
+      },
+      "reference": {
+        "response": {
+          "role": "model",
+          "parts": [
+            {
+              "text": "No Kubernetes failure signatures or errors were detected in the provided logs; the logs show normal pod scheduling, image pull, container startup, and healthy operation for Pod/frontend-web-6d4b7c8f9-abcde. If an issue is occurring, the root cause is inconclusive from these logs alone and additional logs or cluster events are needed."
+            }
+          ]
+        }
+      }
+    }
+  ]
+}

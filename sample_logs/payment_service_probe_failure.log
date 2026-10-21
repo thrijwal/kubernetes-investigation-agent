@@ -1,0 +1,9 @@
+2026-10-20T11:01:10.002Z INFO  [payment-api] Starting payment-service-6b9f4d7c8-q4w8p in namespace payments (container: payment-api, image: us-east1-docker.pkg.dev/acme/payments/payment-api:v3.4.0)
+2026-10-20T11:01:15.220Z ERROR [payment-api] db/pool.go:84: failed to initialize postgres connection pool: dial tcp 10.96.0.15:5432: connect: connection refused
+2026-10-20T11:01:20.415Z WARN  [payment-api] Healthcheck /healthz dependency check failed: postgres_db=UNREACHABLE (10.96.0.15:5432)
+2026-10-20T11:01:25.001Z Warning  Unhealthy  Pod/payment-service-6b9f4d7c8-q4w8p  Readiness probe failed: HTTP probe failed with statuscode: 503
+2026-10-20T11:01:35.004Z ERROR [payment-api] db/pool.go:84: retry 4/5 failed: dial tcp 10.96.0.15:5432: connect: connection refused
+2026-10-20T11:01:45.010Z Warning  Unhealthy  Pod/payment-service-6b9f4d7c8-q4w8p  Liveness probe failed: HTTP probe failed with statuscode: 503
+2026-10-20T11:01:45.450Z Normal   Killing    Pod/payment-service-6b9f4d7c8-q4w8p  Container payment-api failed liveness probe, will be restarted
+2026-10-20T11:01:46.120Z Normal   Terminated Pod/payment-service-6b9f4d7c8-q4w8p  State: Terminated, Reason: Error, Exit Code: 143
+2026-10-20T11:01:58.800Z Warning  BackOff    Pod/payment-service-6b9f4d7c8-q4w8p  Back-off restarting failed container payment-api in pod payment-service-6b9f4d7c8-q4w8p_payments (CrashLoopBackOff)

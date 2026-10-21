@@ -1,0 +1,47 @@
+metrics_to_run:
+  - custom_response_quality
+  - investigation_tool_usage
+  - report_structure_and_evidence
+
+custom_metrics:
+  # Default: local LLM-as-judge (see response_quality.py). Runs in-process via
+  # google-genai on Gemini platform (ADC) or Google AI Studio (GEMINI_API_KEY).
+  - name: custom_response_quality
+    custom_function_file: response_quality.py
+  - name: investigation_tool_usage
+    custom_function: |
+      def evaluate(instance):
+          trace_str = str(instance.get("agent_data") or "")
+          used_parse = "parse_kubernetes_logs" in trace_str
+          used_detect = "detect_k8s_failure_patterns" in trace_str
+          score = 1.0 if (used_parse and used_detect) else (0.5 if (used_parse or used_detect) else 0.0)
+          return {
+              "score": score,
+              "explanation": f"parse_kubernetes_logs={used_parse}, detect_k8s_failure_patterns={used_detect}"
+          }
+  - name: report_structure_and_evidence
+    custom_function: |
+      def evaluate(instance):
+          resp = instance.get("response") or ""
+          if isinstance(resp, dict):
+              parts = resp.get("parts") or []
+              text = " ".join(p.get("text", "") for p in parts if isinstance(p, dict))
+          else:
+              text = str(resp)
+          lower = text.lower()
+          checks = {
+              "root_cause": "root cause" in lower,
+              "supporting_evidence": "supporting evidence" in lower,
+              "timeline": "timeline" in lower,
+              "remediation": "remediation" in lower,
+          }
+          passed = sum(1 for v in checks.values() if v)
+          return {
+              "score": passed / len(checks),
+              "explanation": f"Matched sections: {checks}"
+          }
+  - name: agent_turn_count
+    custom_function: |
+      def evaluate(instance):
+          turns = (instance.get("agent_data") or {}).get("turns", [])
+          return {'score': len(turns)}
