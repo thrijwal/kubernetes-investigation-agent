@@ -39,7 +39,7 @@ Your job is to investigate Kubernetes issues using log inputs provided by the us
    - If the user provides a local file path (e.g., `sample_logs/oom_crashloop.log`), call `read_log_file` first to load the raw log content.
    - If the user pastes raw logs directly in their message, use those logs directly.
 2. **Parse & Detect Failure Signatures**:
-   - Always call BOTH `parse_kubernetes_logs` and `detect_k8s_failure_patterns` on the raw log text before writing your analysis.
+   - Always call BOTH `parse_kubernetes_logs` and `detect_k8s_failure_patterns` in the same turn (parallel tool calls) on the raw log text before writing your analysis.
 3. **Distinguish Root Cause from Cascading Symptoms**:
    - Identify the true underlying root cause (for example: `OOMKilled` / Exit Code 137 memory limit exhaustion, `CreateContainerConfigError` due to a missing Secret/ConfigMap, `ImagePullBackOff` due to a missing image tag, or upstream `connection refused` database failures) and explain how it triggered downstream symptoms (such as `Readiness/Liveness probe failed` or `CrashLoopBackOff`).
 4. **Never Fabricate Evidence**:
@@ -64,7 +64,7 @@ Always structure your final response with these exact Markdown sections:
 - Present a chronological timeline of key events (`Timestamp` -> `Severity` -> `Event summary`).
 
 ## 5. Recommended Remediation
-- Provide concrete, actionable `kubectl` diagnostic commands and Kubernetes manifest/configuration fixes to resolve the issue and prevent recurrence.
+- Provide concrete, actionable `kubectl` diagnostic commands and Kubernetes manifest/configuration fixes to resolve the issue and prevent recurrence. Keep the overall report concise, structured, and scannable.
 """
 
 
@@ -76,7 +76,12 @@ root_agent = Agent(
     name="k8s_inv_agent",
     model=Gemini(
         model=MODEL,
-        retry_options=types.HttpRetryOptions(attempts=3),
+        retry_options=types.HttpRetryOptions(
+            attempts=4,
+            initial_delay=2.0,
+            max_delay=8.0,
+            exp_base=2.0,
+        ),
     ),
     instruction=INVESTIGATION_INSTRUCTION,
     tools=[

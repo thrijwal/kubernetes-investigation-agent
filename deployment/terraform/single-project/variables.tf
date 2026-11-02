@@ -47,23 +47,3 @@ variable "app_sa_roles" {
     "roles/serviceusage.serviceUsageConsumer",
   ]
 }
-
-variable "agent_framework" {
-  description = "Framework label on the Agent Runtime deployment. The Google Cloud console reads it to pick a playground; override it when the container is not an ADK app."
-  type        = string
-  default     = "google-adk"
-}
-
-variable "agent_identity_roles" {
-  description = "List of roles to assign to the agent's Agent Identity principal. Keep the first six in sync with AGENT_IDENTITY_ROLES in agents-cli, which `agents-cli deploy` grants."
-  type        = list(string)
-  default = [
-    "roles/aiplatform.user",
-    "roles/serviceusage.serviceUsageConsumer",
-    "roles/browser",
-    "roles/cloudapiregistry.viewer",
-    "roles/logging.logWriter",
-    "roles/monitoring.metricWriter",
-    "roles/cloudtrace.agent",
-  ]
-}

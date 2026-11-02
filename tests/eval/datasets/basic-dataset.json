@@ -1,12 +1,12 @@
 {
   "eval_cases": [
     {
-      "eval_case_id": "oom_killed_pasted_logs",
+      "eval_case_id": "incident_1_oomkilled_and_crashloopbackoff",
       "prompt": {
         "role": "user",
         "parts": [
           {
-            "text": "Investigate the following Kubernetes pod logs and provide a detailed root-cause analysis and supporting evidence:\n\n2026-10-20T10:14:02.190Z WARN  [order-worker] Heap memory usage at 488Mi / 512Mi (95.3%) while buffering batch_id=20261020_09\n2026-10-20T10:14:08.901Z ERROR [order-worker] MemoryError: Unable to allocate 64.0 MiB for in-memory settlement aggregation buffer\n2026-10-20T10:14:09.112Z FATAL [kernel] Memory cgroup out of memory: Killed process 18422 (python3) total-vm:1245184kB, anon-rss:524288kB, file-rss:1420kB\n2026-10-20T10:14:10.015Z Normal   Killing     Pod/order-processor-7d8f9c6b5-x9k2m  State: Terminated, Reason: OOMKilled, Exit Code: 137\n2026-10-20T10:14:12.330Z Warning  BackOff     Pod/order-processor-7d8f9c6b5-x9k2m  Back-off restarting failed container order-worker in pod order-processor-7d8f9c6b5-x9k2m_prod-commerce (CrashLoopBackOff)"
+            "text": "Investigate the following Kubernetes pod logs for an OOMKilled and CrashLoopBackOff incident and provide a detailed root-cause analysis and supporting evidence:\n\n2026-10-21T08:12:01.104Z INFO  [order-worker] Starting order-processor-7d8f9c6b5-x9k2m in namespace prod-commerce (container: order-worker, image: gcr.io/acme-prod/order-worker:v1.8.2)\n2026-10-21T08:13:15.882Z INFO  [order-worker] Processing bulk settlement batch batch_id=20261021_08 (items=250000)\n2026-10-21T08:14:02.190Z WARN  [order-worker] Heap memory usage at 488Mi / 512Mi (95.3%) while buffering batch_id=20261021_08\n2026-10-21T08:14:08.901Z ERROR [order-worker] MemoryError: Unable to allocate 64.0 MiB for in-memory settlement aggregation buffer\n2026-10-21T08:14:09.112Z FATAL [kernel] Memory cgroup out of memory: Killed process 18422 (python3) total-vm:1245184kB, anon-rss:524288kB, file-rss:1420kB\n2026-10-21T08:14:10.015Z Normal   Killing     Pod/order-processor-7d8f9c6b5-x9k2m  State: Terminated, Reason: OOMKilled, Exit Code: 137\n2026-10-21T08:14:12.330Z Warning  BackOff     Pod/order-processor-7d8f9c6b5-x9k2m  Back-off restarting failed container order-worker in pod order-processor-7d8f9c6b5-x9k2m_prod-commerce (CrashLoopBackOff)"
           }
         ]
       },
@@ -15,19 +15,19 @@
           "role": "model",
           "parts": [
             {
-              "text": "The primary root cause is container memory exhaustion (OOMKilled with Exit Code 137) in container order-worker of pod order-processor-7d8f9c6b5-x9k2m (namespace prod-commerce) after reaching its 512Mi memory limit while buffering batch_id=20261020_09. CrashLoopBackOff is a downstream symptom. Supporting evidence includes the verbatim log lines showing 488Mi/512Mi heap usage, MemoryError allocating 64.0 MiB, kernel Memory cgroup out of memory killing process 18422, State: Terminated Reason: OOMKilled Exit Code: 137, and Back-off restarting failed container."
+              "text": "The primary root cause is container memory exhaustion (OOMKilled with Exit Code 137) in container order-worker of pod order-processor-7d8f9c6b5-x9k2m (namespace prod-commerce) after exceeding its 512Mi memory limit while buffering batch_id=20261021_08. CrashLoopBackOff is a cascading symptom of repeated OOM terminations."
             }
           ]
         }
       }
     },
     {
-      "eval_case_id": "probe_and_db_failure_file_logs",
+      "eval_case_id": "incident_2_cpu_throttling_and_container_crash",
       "prompt": {
         "role": "user",
         "parts": [
           {
-            "text": "Please investigate the Kubernetes incident in the local log file sample_logs/payment_service_probe_failure.log and provide a detailed analysis and supporting evidence."
+            "text": "Investigate the following Kubernetes logs for a CPU throttling and container crash incident and provide a detailed root-cause analysis and supporting evidence:\n\n2026-10-21T09:00:01.100Z INFO  [pricing-engine] Starting Pod/pricing-engine-5f8c9d7b6-r4t2n in namespace pricing-prod (container: pricing-engine, image: gcr.io/acme-prod/pricing-engine:v4.1.0, resources.limits.cpu=100m, cfs_quota_us=10000)\n2026-10-21T09:01:10.420Z WARN  [cadvisor] Pod/pricing-engine-5f8c9d7b6-r4t2n container_cpu_cfs_throttled: CPU usage hit limit 100m; nr_throttled=1420 throttled_time=89400ms (89.4% CPU throttling)\n2026-10-21T09:01:15.805Z WARN  [pricing-engine] Worker thread pool severely throttled by CFS quota; gRPC request queue latency p99=12400ms\n2026-10-21T09:01:20.012Z ERROR [kubelet] Pod/pricing-engine-5f8c9d7b6-r4t2n Readiness probe failed: context deadline exceeded (Client.Timeout exceeded while awaiting headers)\n2026-10-21T09:01:24.990Z FATAL [pricing-engine] panic: runtime error: internal watchdog heartbeat deadline exceeded (15s) due to severe CPU throttling\n2026-10-21T09:01:25.150Z Warning  Failed      Pod/pricing-engine-5f8c9d7b6-r4t2n  Container pricing-engine terminated: State: Terminated, Reason: Error, Exit Code: 2\n2026-10-21T09:01:28.400Z Warning  BackOff     Pod/pricing-engine-5f8c9d7b6-r4t2n  Back-off restarting failed container pricing-engine in pod pricing-engine-5f8c9d7b6-r4t2n_pricing-prod (CrashLoopBackOff)"
           }
         ]
       },
@@ -36,19 +36,19 @@
           "role": "model",
           "parts": [
             {
-              "text": "The primary root cause is an upstream PostgreSQL database connection failure (dial tcp 10.96.0.15:5432: connect: connection refused) in container payment-api of pod payment-service-6b9f4d7c8-q4w8p (namespace payments). Because the database is unreachable, the /healthz endpoint returned HTTP 503, causing both Readiness and Liveness probe failures, which triggered kubelet to kill and restart the container (Exit Code 143) and enter CrashLoopBackOff."
+              "text": "The primary root cause is severe container CPU throttling (89.4% CFS quota throttling with resources.limits.cpu=100m, cfs_quota_us=10000, nr_throttled=1420) in Pod/pricing-engine-5f8c9d7b6-r4t2n (namespace pricing-prod). CPU starvation caused 12.4s p99 latency, readiness probe timeouts, an internal watchdog heartbeat panic (Exit Code 2 container crash), and subsequent CrashLoopBackOff."
             }
           ]
         }
       }
     },
     {
-      "eval_case_id": "image_pull_and_secret_config_error",
+      "eval_case_id": "incident_3_node_memory_pressure_and_node_not_ready",
       "prompt": {
         "role": "user",
         "parts": [
           {
-            "text": "Investigate the Kubernetes failures in sample_logs/image_pull_and_config_error.log and provide a detailed analysis with supporting evidence."
+            "text": "Investigate these Kubernetes node and pod logs for a Node Memory Pressure and Node Not Ready incident and provide a detailed analysis and supporting evidence:\n\n2026-10-21T10:30:05.110Z Warning  NodeHasMemoryPressure  Node/gke-prod-pool-2-9f8e7d6c-n4k1  Node gke-prod-pool-2-9f8e7d6c-n4k1 status is now: NodeHasMemoryPressure (available memory 84Mi < eviction threshold 100Mi)\n2026-10-21T10:30:08.450Z Warning  Evicted                Pod/analytics-aggregator-8c7d6b5f4-v9m3k  The node was low on resource: memory. Threshold quantity: 100Mi, available: 84Mi. Container analytics-worker was using 14.8Gi, which exceeds its request of 2Gi (namespace: data-pipeline)\n2026-10-21T10:30:09.100Z Normal   Killing                Pod/analytics-aggregator-8c7d6b5f4-v9m3k  Stopping container analytics-worker due to node MemoryPressure eviction\n2026-10-21T10:31:45.900Z ERROR    [kubelet]              Node/gke-prod-pool-2-9f8e7d6c-n4k1  PLEG is not healthy: pleg was last seen active 3m15s ago; threshold is 3m0s (container runtime rpc timeout under memory thrashing)\n2026-10-21T10:31:46.200Z Warning  NodeNotReady           Node/gke-prod-pool-2-9f8e7d6c-n4k1  Node gke-prod-pool-2-9f8e7d6c-n4k1 status is now: NodeNotReady (KubeletNotReady: PLEG is not healthy)\n2026-10-21T10:31:47.005Z Normal   TaintManagerEviction   Node/gke-prod-pool-2-9f8e7d6c-n4k1  Marking for deletion Pod data-pipeline/analytics-aggregator-8c7d6b5f4-v9m3k due to taint node.kubernetes.io/not-ready:NoExecute"
           }
         ]
       },
@@ -57,19 +57,19 @@
           "role": "model",
           "parts": [
             {
-              "text": "There are two distinct root causes in the checkout namespace: (1) Pod checkout-service-5c7b8f9d4-m2n7v failed with ErrImagePull / ImagePullBackOff because the image tag us-east1-docker.pkg.dev/acme/checkout/checkout-service:v2.9.99-missing was not found in the registry (rpc error: code = NotFound), and (2) Pod checkout-worker-8f4d2c1b9-p9r3t failed with CreateContainerConfigError because the Kubernetes Secret \"stripe-api-credentials\" was not found."
+              "text": "The primary root cause is node-level memory exhaustion (NodeHasMemoryPressure on Node/gke-prod-pool-2-9f8e7d6c-n4k1 where available memory dropped to 84Mi below the 100Mi eviction threshold, driven by container analytics-worker in Pod/analytics-aggregator-8c7d6b5f4-v9m3k using 14.8Gi vs a 2Gi request in namespace data-pipeline). This triggered pod eviction (Reason: Evicted), kubelet PLEG unhealthiness (last seen active 3m15s ago), and the node transitioning to NodeNotReady."
             }
           ]
         }
       }
     },
     {
-      "eval_case_id": "inconclusive_healthy_logs_edge_case",
+      "eval_case_id": "incident_4_incorrect_resource_request_scheduling",
       "prompt": {
         "role": "user",
         "parts": [
           {
-            "text": "Investigate these Kubernetes logs and tell me the root cause and supporting evidence:\n\n2026-10-20T14:00:01.000Z Normal Scheduled Pod/frontend-web-6d4b7c8f9-abcde Successfully assigned default/frontend-web-6d4b7c8f9-abcde to node-pool-1\n2026-10-20T14:00:02.100Z Normal Pulled Pod/frontend-web-6d4b7c8f9-abcde Container image \"nginx:1.27-alpine\" already present on machine\n2026-10-20T14:00:02.450Z Normal Created Pod/frontend-web-6d4b7c8f9-abcde Created container frontend\n2026-10-20T14:00:02.800Z Normal Started Pod/frontend-web-6d4b7c8f9-abcde Started container frontend\n2026-10-20T14:00:05.000Z INFO [nginx] worker processes started and listening on 0.0.0.0:8080"
+            "text": "Investigate the following Kubernetes scheduling logs for an incorrect resource request incident and provide a detailed root-cause analysis and supporting evidence:\n\n2026-10-21T11:15:00.200Z INFO     [deployment-controller]Namespace/ai-serving  Scaled up replica set ml-inference-api-6d9c8b7f5 to 1 (image: us-docker.pkg.dev/acme-ai/models/ml-inference-api:v2.3.0)\n2026-10-21T11:15:00.550Z WARN     [resource-quota]       Pod/ml-inference-api-6d9c8b7f5-w2p8q  Container inference-server configured with requests.cpu=64000m (64 cores) and requests.memory=256Gi; cluster node max allocatable is cpu=15800m, memory=60Gi\n2026-10-21T11:15:01.110Z Warning  FailedScheduling       Pod/ml-inference-api-6d9c8b7f5-w2p8q  0/6 nodes are available: 6 Insufficient cpu, 6 Insufficient memory. preemption: 0/6 nodes are available: 6 No preemption victims found for incoming pod\n2026-10-21T11:15:31.400Z Warning  FailedScheduling       Pod/ml-inference-api-6d9c8b7f5-w2p8q  0/6 nodes are available: 6 Insufficient cpu, 6 Insufficient memory (requests.cpu 64000m exceeds node allocatable 15800m; requests.memory 256Gi exceeds node allocatable 60Gi)"
           }
         ]
       },
@@ -78,7 +78,28 @@
           "role": "model",
           "parts": [
             {
-              "text": "No Kubernetes failure signatures or errors were detected in the provided logs; the logs show normal pod scheduling, image pull, container startup, and healthy operation for Pod/frontend-web-6d4b7c8f9-abcde. If an issue is occurring, the root cause is inconclusive from these logs alone and additional logs or cluster events are needed."
+              "text": "The primary root cause is an incorrect/excessive pod resource request on Pod/ml-inference-api-6d9c8b7f5-w2p8q (container inference-server in namespace ai-serving), which requests 64000m CPU (64 cores) and 256Gi memory while the maximum allocatable capacity per node across all 6 nodes is 15800m CPU and 60Gi memory, resulting in FailedScheduling (0/6 nodes are available: 6 Insufficient cpu, 6 Insufficient memory)."
+            }
+          ]
+        }
+      }
+    },
+    {
+      "eval_case_id": "incident_5_service_routes_to_wrong_and_unhealthy_pods",
+      "prompt": {
+        "role": "user",
+        "parts": [
+          {
+            "text": "Investigate the following Kubernetes logs where a Service routes traffic to wrong and unhealthy pods and provide a detailed root-cause analysis and supporting evidence:\n\n2026-10-21T12:05:01.050Z WARN  [endpointslice-controller] Namespace/payments  Service/payments-gateway-svc selector 'app=payments' matched 2 pods with different roles: Pod/payments-gateway-7c6d5f8b9-k3l9p (role=api, port=8080) and Pod/payments-batch-migrator-4b7c9d8f2-z8x1q (role=batch-worker, port=9090); app=payments label mismatch across workloads\n2026-10-21T12:05:02.110Z WARN  [endpointslice-controller] Namespace/payments  Service/payments-gateway-svc has publishNotReadyAddresses=true and Pod/payments-gateway-7c6d5f8b9-k3l9p has no readinessProbe configured; EndpointSlice payments-gateway-svc-abc12 includes unready endpoint 10.244.1.44:8080\n2026-10-21T12:05:10.300Z ERROR [envoy-ingress]            Namespace/payments  Service/payments-gateway-svc routed request req-901 to wrong pod Pod/payments-batch-migrator-4b7c9d8f2-z8x1q (10.244.2.19:8080): targetPort 8080 mismatch — dial tcp 10.244.2.19:8080: connect: connection refused (container batch-worker listens on 9090)\n2026-10-21T12:05:12.450Z ERROR [payments-gateway]         Pod/payments-gateway-7c6d5f8b9-k3l9p  Received live traffic on /v1/charge while database schema migration is still initializing; routing traffic to unready pod returned HTTP 503 Service Unavailable\n2026-10-21T12:05:15.000Z ERROR [envoy-ingress]            Namespace/payments  Upstream unhealthy endpoint errors on Service/payments-gateway-svc: 52% HTTP 502 Bad Gateway (wrong pod 10.244.2.19:8080) and 48% HTTP 503 Service Unavailable (unready pod 10.244.1.44:8080)"
+          }
+        ]
+      },
+      "reference": {
+        "response": {
+          "role": "model",
+          "parts": [
+            {
+              "text": "The primary root cause is a Kubernetes Service routing misconfiguration on Service/payments-gateway-svc in namespace payments with two compounding issues: (1) an overly broad label selector ('app=payments' without role specificity) that routes traffic to the wrong pod (Pod/payments-batch-migrator-4b7c9d8f2-z8x1q, which listens on port 9090 instead of targetPort 8080, causing connection refused / HTTP 502), and (2) publishNotReadyAddresses=true combined with no readinessProbe configured on Pod/payments-gateway-7c6d5f8b9-k3l9p, causing traffic to route to an unready pod still running schema migrations (returning HTTP 503)."
             }
           ]
         }

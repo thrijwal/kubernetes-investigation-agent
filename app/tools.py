@@ -234,23 +234,89 @@ K8S_FAILURE_SIGNATURES: list[dict[str, Any]] = [
     },
     {
         "id": "scheduling_or_node_pressure",
-        "category": "Pod Scheduling Failure / Node Resource Pressure / Eviction",
+        "category": "Pod Scheduling Failure / Incorrect Resource Request / Node Memory Pressure",
         "severity": "high",
         "is_root_cause": True,
         "regex": re.compile(
             r"(FailedScheduling|Insufficient cpu|Insufficient memory|"
             r"0/\d+ nodes are available|had untolerated taint|"
-            r"The node was low on resource|DiskPressure|MemoryPressure|PIDPressure|Evicted)",
+            r"The node was low on resource|DiskPressure|MemoryPressure|PIDPressure|Evicted|"
+            r"must be less than or equal to cpu limit|must be less than or equal to memory limit|"
+            r"requests\.cpu .* exceeds|requests\.memory .* exceeds)",
             re.IGNORECASE,
         ),
         "description": (
-            "The Kubernetes scheduler could not place the pod on any node due to insufficient CPU/memory, "
-            "taints/affinity rules, or the kubelet evicted the pod due to node resource pressure."
+            "The Kubernetes scheduler could not place the pod on any node due to excessive/incorrect CPU or memory "
+            "resource requests, taints/affinity rules, or the kubelet evicted the pod due to Node MemoryPressure/DiskPressure."
         ),
         "recommended_actions": [
             "Check node capacity and allocatable resources: `kubectl describe nodes`",
-            "Review pod resource `requests`, `nodeSelector`, `affinity`, and `tolerations`.",
-            "If evicted due to `DiskPressure` or `MemoryPressure`, inspect node-level resource consumers or scale the node pool.",
+            "Right-size pod `resources.requests` and `resources.limits` so requests do not exceed node allocatable capacity or limits.",
+            "If evicted due to `MemoryPressure` or `DiskPressure`, inspect node-level resource consumers or scale the node pool.",
+        ],
+    },
+    {
+        "id": "cpu_throttling",
+        "category": "Container CPU Throttling / CFS Quota Starvation",
+        "severity": "high",
+        "is_root_cause": True,
+        "regex": re.compile(
+            r"(cpu throttling|cfs_quota_us|nr_throttled|throttled_time|"
+            r"CPU usage hit limit|container_cpu_cfs_throttled|CFS quota|"
+            r"severely throttled|CPU limit .* throttled)",
+            re.IGNORECASE,
+        ),
+        "description": (
+            "The container is experiencing Linux kernel CFS CPU quota throttling due to a restrictive "
+            "`resources.limits.cpu` setting, causing severe latency spikes, health probe timeouts, and container crashes."
+        ),
+        "recommended_actions": [
+            "Inspect container CPU limits and throttling metrics (`container_cpu_cfs_throttled_periods_total / container_cpu_cfs_periods_total`).",
+            "Increase or remove `resources.limits.cpu` while keeping an appropriate `resources.requests.cpu` value.",
+            "Tune application worker/thread counts (e.g., `GOMAXPROCS`, JVM active processor count) to match the container CPU request.",
+        ],
+    },
+    {
+        "id": "node_not_ready",
+        "category": "Node NotReady / Kubelet or PLEG Unhealthy",
+        "severity": "critical",
+        "is_root_cause": True,
+        "regex": re.compile(
+            r"(NodeNotReady|status is now: NodeNotReady|KubeletNotReady|"
+            r"PLEG is not healthy|ContainerGCFailed|Node .* NotReady|"
+            r"node.kubernetes.io/not-ready|runtime network not ready)",
+            re.IGNORECASE,
+        ),
+        "description": (
+            "The underlying Kubernetes worker node transitioned to `NodeNotReady` due to kubelet failure, "
+            "Pod Lifecycle Event Generator (PLEG) hangs, container runtime unresponsiveness, or severe node resource exhaustion."
+        ),
+        "recommended_actions": [
+            "Inspect node conditions and kubelet events: `kubectl describe node <node-name>`",
+            "Check kubelet and containerd system logs on the affected node: `journalctl -u kubelet -u containerd`",
+            "Cordon and drain the unhealthy node if recovery fails: `kubectl cordon <node-name> && kubectl drain <node-name> --ignore-daemonsets`",
+        ],
+    },
+    {
+        "id": "service_routing_misconfiguration",
+        "category": "Service Routing to Wrong or Unhealthy Pods / Endpoint Mismatch",
+        "severity": "high",
+        "is_root_cause": True,
+        "regex": re.compile(
+            r"(publishNotReadyAddresses|selector .* match|routing traffic to unready|"
+            r"wrong pod|unhealthy endpoint|EndpointSlice .* not ready|"
+            r"targetPort .* mismatch|Service .* routes to|app=.* label mismatch|"
+            r"no readinessProbe configured)",
+            re.IGNORECASE,
+        ),
+        "description": (
+            "A Kubernetes Service is routing traffic to wrong or unhealthy pods due to an overly broad or mismatched "
+            "label `selector`, `publishNotReadyAddresses: true`, `targetPort` mismatch, or missing `readinessProbe`."
+        ),
+        "recommended_actions": [
+            "Compare the Service selector against pod labels: `kubectl describe svc <service-name> -n <namespace>` and `kubectl get pods --show-labels -n <namespace>`",
+            "Inspect active Endpoints / EndpointSlices: `kubectl get endpoints,endpointslices -n <namespace>`",
+            "Ensure `publishNotReadyAddresses` is `false` and configure a valid `readinessProbe` so unready pods are removed from Service endpoints.",
         ],
     },
     {

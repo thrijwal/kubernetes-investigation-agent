@@ -13,9 +13,11 @@
 # limitations under the License.
 """Unit tests for deterministic Kubernetes log parsing and failure detection tools."""
 
+import json
 from unittest.mock import MagicMock, patch
 
 from app.tools import (
+    PROJECT_ROOT,
     detect_k8s_failure_patterns,
     get_pod_logs,
     parse_kubernetes_logs,
@@ -114,3 +116,74 @@ def test_get_pod_logs_falls_back_to_sample_logs_and_validates_names() -> None:
 
     invalid = get_pod_logs(pod_name="--invalid-flag; rm -rf")
     assert invalid["status"] == "error"
+
+
+def test_all_five_eval_dataset_incident_cases_detect_expected_patterns() -> None:
+    dataset_path = PROJECT_ROOT / "tests" / "eval" / "datasets" / "basic-dataset.json"
+    dataset = json.loads(dataset_path.read_text(encoding="utf-8"))
+    eval_cases = dataset["eval_cases"]
+    assert len(eval_cases) == 5
+
+    expected_pattern_ids = {
+        "incident_1_oomkilled_and_crashloopbackoff": {
+            "oom_killed",
+            "crash_loop_backoff",
+        },
+        "incident_2_cpu_throttling_and_container_crash": {
+            "cpu_throttling",
+            "application_crash_or_exception",
+            "crash_loop_backoff",
+        },
+        "incident_3_node_memory_pressure_and_node_not_ready": {
+            "scheduling_or_node_pressure",
+            "node_not_ready",
+        },
+        "incident_4_incorrect_resource_request_scheduling": {
+            "scheduling_or_node_pressure",
+        },
+        "incident_5_service_routes_to_wrong_and_unhealthy_pods": {
+            "service_routing_misconfiguration",
+        },
+    }
+
+    for case in eval_cases:
+        case_id = case["eval_case_id"]
+        prompt_text = case["prompt"]["parts"][0]["text"]
+        parsed = parse_kubernetes_logs(prompt_text)
+        detected = detect_k8s_failure_patterns(prompt_text)
+        assert parsed["status"] == "success"
+        assert detected["status"] == "success"
+        found_ids = {p["id"] for p in detected["matched_patterns"]}
+        assert expected_pattern_ids[case_id].issubset(found_ids), (
+            f"Missing expected pattern IDs for {case_id}: {expected_pattern_ids[case_id] - found_ids}"
+        )
+
+
+def test_cidr_allowlisting_helpers_and_middleware(monkeypatch) -> None:
+    from fastapi.testclient import TestClient
+
+    from app.fast_api_app import app, is_ip_allowed, parse_allowed_cidrs
+
+    networks = parse_allowed_cidrs("10.10.1.0/24, 192.168.1.50/32")
+    assert len(networks) == 2
+    assert is_ip_allowed("10.10.1.42", networks) is True
+    assert is_ip_allowed("192.168.1.50", networks) is True
+    assert is_ip_allowed("203.0.113.9", networks) is False
+
+    client = TestClient(app)
+
+    # 1. When ALLOWED_CIDRS is unset, all client IPs are allowed
+    monkeypatch.delenv("ALLOWED_CIDRS", raising=False)
+    resp_unrestricted = client.get("/docs", headers={"X-Forwarded-For": "203.0.113.9"})
+    assert resp_unrestricted.status_code == 200
+
+    # 2. When ALLOWED_CIDRS is set, matching IPs are allowed and non-matching IPs receive 403
+    monkeypatch.setenv("ALLOWED_CIDRS", "10.10.1.0/24, 192.168.100.0/24")
+    resp_allowed = client.get(
+        "/docs", headers={"X-Forwarded-For": "10.10.1.25, 35.191.0.1"}
+    )
+    assert resp_allowed.status_code == 200
+
+    resp_blocked = client.get("/docs", headers={"X-Forwarded-For": "203.0.113.99"})
+    assert resp_blocked.status_code == 403
+    assert "ALLOWED_CIDRS" in resp_blocked.json()["detail"]

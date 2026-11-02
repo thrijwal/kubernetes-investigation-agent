@@ -23,6 +23,10 @@ terraform {
       source  = "hashicorp/random"
       version = "~> 3.7.0"
     }
+    kubernetes = {
+      source  = "hashicorp/kubernetes"
+      version = "~> 2.37.0"
+    }
   }
 }
 
@@ -38,4 +42,12 @@ provider "google" {
 provider "google" {
   alias  = "api_bootstrap"
   region = var.region
+}
+
+data "google_client_config" "default" {}
+
+provider "kubernetes" {
+  host                   = "https://${google_container_cluster.app.endpoint}"
+  token                  = data.google_client_config.default.access_token
+  cluster_ca_certificate = base64decode(google_container_cluster.app.master_auth[0].cluster_ca_certificate)
 }

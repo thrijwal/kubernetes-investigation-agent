@@ -12,38 +12,31 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-locals {
-  dummy_source_b64 = trimspace(file("${path.module}/../shared/dummy_source.b64"))
-}
 
-resource "google_vertex_ai_reasoning_engine" "app" {
-  display_name = var.project_name
-  description  = "Agent deployed via Terraform"
-  region       = var.region
-  project      = var.project_id
+resource "google_cloud_run_v2_service" "app" {
+  name                = var.project_name
+  location            = var.region
+  project             = var.project_id
+  deletion_protection = false
+  ingress             = "INGRESS_TRAFFIC_ALL"
+  labels = {
+    "created-by"                  = "agents-cli"
+  }
 
-  spec {
-    agent_framework = var.agent_framework
-    service_account = ""
-    identity_type   = "AGENT_IDENTITY"
+  template {
+    containers {
+      image = "us-docker.pkg.dev/cloudrun/container/hello"
 
-    deployment_spec {
-      min_instances         = 1
-      max_instances         = 10
-      container_concurrency = 9
-
-      resource_limits = {
-        cpu    = "4"
-        memory = "8Gi"
+      env {
+        name  = "APP_URL"
+        value = "https://${var.project_name}-${data.google_project.project.number}.${var.region}.run.app"
       }
 
       env {
-        name  = "LOGS_BUCKET_NAME"
-        value = google_storage_bucket.logs_data_bucket.name
+        name  = "GOOGLE_CLOUD_PROJECT"
+        value = var.project_id
       }
 
-      # GOOGLE_CLOUD_PROJECT is reserved by Agent Runtime (the platform injects
-      # it) and rejected in deployment_spec.env; GOOGLE_CLOUD_LOCATION is allowed.
       env {
         name  = "GOOGLE_CLOUD_LOCATION"
         value = "global"
@@ -54,14 +47,23 @@ resource "google_vertex_ai_reasoning_engine" "app" {
         value = "True"
       }
 
+      resources {
+        limits = {
+          cpu    = "1"
+          memory = "4Gi"
+        }
+      }
+
+      env {
+        name  = "LOGS_BUCKET_NAME"
+        value = google_storage_bucket.logs_data_bucket.name
+      }
+
       env {
         name  = "OTEL_SERVICE_NAME"
         value = "k8s-inv-agent"
       }
 
-      # Prompt/response content capture, off by default. Go: set "true" to log
-      # content to OTLP log events for the completions view. Python: content goes to
-      # GCS via the completion hook, so NO_CONTENT.
       env {
         name  = "OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT"
         value = "NO_CONTENT"
@@ -91,34 +93,42 @@ resource "google_vertex_ai_reasoning_engine" "app" {
         name  = "OTEL_INSTRUMENTATION_GENAI_UPLOAD_BASE_PATH"
         value = "gs://${google_storage_bucket.logs_data_bucket.name}/completions"
       }
-
-      env {
-        name  = "GOOGLE_CLOUD_AGENT_ENGINE_ENABLE_TELEMETRY"
-        value = "true"
-      }
     }
 
-    source_code_spec {
-      inline_source {
-        source_archive = local.dummy_source_b64
-      }
-      image_spec {}
+    service_account = google_service_account.app_sa.email
+    max_instance_request_concurrency = 8
+
+    scaling {
+      min_instance_count = 1
+      max_instance_count = 10
     }
+
+    vpc_access {
+      network_interfaces {
+        network    = google_compute_network.k8s_agent_prod_vpc.name
+        subnetwork = google_compute_subnetwork.k8s_agent_egress_subnet.name
+      }
+      egress = "ALL_TRAFFIC"
+    }
+
+    session_affinity = true
   }
 
-  # Terraform creates the resource with a placeholder source build; CI/CD
-  # overwrites the same source_code_spec with the real code. The deploy writes
-  # source_code_spec, so the placeholder must use it too — a container_spec
-  # placeholder would be left alongside it and Agent Runtime rejects the update.
-  # Ignore the spec and deployment_spec so Terraform never reverts the deployed agent.
+  traffic {
+    type    = "TRAFFIC_TARGET_ALLOCATION_TYPE_LATEST"
+    percent = 100
+  }
+
+  # This lifecycle block prevents Terraform from overwriting the container image when it's
+  # updated by Cloud Run deployments outside of Terraform (e.g., via CI/CD pipelines)
   lifecycle {
     ignore_changes = [
-      spec[0].container_spec,
-      spec[0].source_code_spec,
-      spec[0].deployment_spec,
+      template[0].containers[0].image,
     ]
   }
 
   # Make dependencies conditional to avoid errors.
-  depends_on = [google_project_service.services]
+  depends_on = [
+    resource.google_project_service.services,
+  ]
 }
