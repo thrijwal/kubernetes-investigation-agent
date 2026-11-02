@@ -206,6 +206,19 @@ Telemetry can export to Cloud Trace, BigQuery, and Cloud Logging.
 
 This agent also speaks the [A2A Protocol](https://a2a-protocol.org/). Use the [A2A Inspector](https://github.com/a2aproject/a2a-inspector) to test interoperability.
 
+### Deployment evidence
+
+This project was deployed by the author to both Google Cloud Agent Runtime and
+Cloud Run as a hands-on comparison of managed agent-native deployment and a
+container-based service. The records below explain the architecture, validation
+approach, and platform trade-offs without relying on a still-running GCP
+environment:
+
+- [Agent Runtime deployment record](docs/deployments/2026-11-02-agent-runtime.md)
+- [Cloud Run deployment record](docs/deployments/2026-11-02-cloud-run.md)
+- [Agent Runtime vs. Cloud Run comparison](docs/deployments/agent-runtime-vs-cloud-run.md)
+- [Evidence capture and redaction checklist](docs/deployments/evidence-checklist.md)
+
 ---
 
 ## Development notes
